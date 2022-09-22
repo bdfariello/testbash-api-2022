@@ -12,17 +12,13 @@ class RoomInterface(object):
         self._client = client
 
     def get_rooms(self) -> Response:
-        uri = "/room/"
-        return self._client.get(uri)
+        return self._client.get("/room/")
 
     def get_room(self, room_id: int) -> Response:
-        uri = f"/room/{room_id}"
-        return self._client.get(uri)
+        return self._client.get(f"/room/{room_id}")
 
     def create_room(self, room_data: dict) -> Response:
-        uri = f"/room/"
-        return self._client.post(uri, json_data=room_data)
+        return self._client.post("/room/", json_data=room_data)
 
     def delete_room(self, room_id: int) -> Response:
-        uri = f"/room/{room_id}"
-        return self._client.delete(uri)
+        return self._client.delete(f"/room/{room_id}")

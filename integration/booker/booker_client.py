@@ -4,7 +4,6 @@ from integration.rest.rest_base import RestBase
 
 
 class BookerClient(RestBase):
-    base_url: str = None
     token: str = None
 
     def __init__(self, username: str = None, password: str = None):
@@ -16,6 +15,8 @@ class BookerClient(RestBase):
             "content-type": "application/json"
         }
         if username is not None and password is not None:
+            # self.token and self.request_headers from RestBase superclass
+            # are set inside self.auth.login()
             self.auth.login(username, password)
 
     @property

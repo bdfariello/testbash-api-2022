@@ -11,47 +11,49 @@ valid_room_types = ["Single", "Double", "Twin", "Family", "Suite"]
 
 
 @pytest.fixture(scope="class")
-def room_id_list() -> List[int]:
-    yield []
+def starting_room_id_list(client) -> List[int]:
+    rooms = []
+    response = client.room.get_rooms()
+    assert (
+            200 == response.status_code
+    ), f"Unexpected status code getting rooms. Expected 200. Got {response.status_code}"
+
+    # Store valid Room ID's for later
+    for room in response.json()["rooms"]:
+        rooms.append(room["roomid"])
+    yield rooms
 
 
 @pytest.fixture(scope="class")
 def created_room_ids(client) -> List[int]:
     created_room_ids_list = []
     yield created_room_ids_list
+    # After a test class completes, iterate through the list of rooms
+    # created during test execution and delete all these rooms
     for room_id in created_room_ids_list:
         client.room.delete_room(room_id)
 
 
-def validate_room_attribute(
-    room: dict, attr_name: str, expected: Union[str, int]
-) -> list:
-    if attr_name not in room:
-        return [f"Expected attribute {attr_name} not found in room {room}"]
-    elif room[attr_name] != expected:
-        return [f"Room {attr_name} had value {room[attr_name]}. Expected: {expected}"]
-    else:
-        return []
-
-
 @pytest.mark.smoke
 class TestRoomSmoke(object):
-    def test_get_rooms(self, client, room_id_list):
-        response = client.room.get_rooms()
-        assert (
-            200 == response.status_code
-        ), f"Unexpected status code getting rooms. Expected 200. Got {response.status_code}"
+    @staticmethod
+    def validate_room_attribute(
+            room: dict, attr_name: str, expected: Union[str, int]
+    ) -> List[str]:
+        if attr_name not in room:
+            return [f"Expected attribute {attr_name} not found in room {room}"]
+        elif room[attr_name] != expected:
+            return [f"Room {attr_name} had value {room[attr_name]}. Expected: {expected}"]
+        else:
+            return []
 
-        # Store valid Room ID's for later
-        for room in response.json()["rooms"]:
-            room_id_list.append(room["roomid"])
+    def test_get_all_rooms(self, client, starting_room_id_list):
+        assert starting_room_id_list, f"No rooms found in response to /room/"
 
-        assert room_id_list, f"No rooms found in response: {response.text}"
-
-    def test_get_valid_room(self, client, room_id_list):
-        if not room_id_list:
+    def test_get_valid_room(self, client, starting_room_id_list):
+        if not starting_room_id_list:
             pytest.skip("No rooms found in GET /room/ endpoint. Cannot continue")
-        test_room_id = room_id_list[0]
+        test_room_id = starting_room_id_list[0]
         response = client.room.get_room(test_room_id)
         assert (
             200 == response.status_code
@@ -60,10 +62,11 @@ class TestRoomSmoke(object):
             response.json().get("roomid") == test_room_id
         ), f"Expected roomid {test_room_id}. Got wrong room back: {response.text}"
 
-    def test_get_invalid_room(self, client, room_id_list):
+    @pytest.mark.negative
+    def test_get_invalid_room(self, client, starting_room_id_list):
         max_room_id = 100
         for test_room_id in range(1, max_room_id + 1):
-            if test_room_id in room_id_list:
+            if test_room_id in starting_room_id_list:
                 continue
             # Now we have a test_room_id NOT in the known list of room IDs
             response = client.room.get_room(test_room_id)
@@ -102,16 +105,16 @@ class TestRoomSmoke(object):
         room = response.json()
         created_room_ids.append(room.get("roomid"))
         errors = []
-        errors.extend(validate_room_attribute(room, "roomName", test_name))
-        errors.extend(validate_room_attribute(room, "type", test_type))
-        errors.extend(validate_room_attribute(room, "accessible", test_accessible))
-        errors.extend(validate_room_attribute(room, "image", test_image))
-        errors.extend(validate_room_attribute(room, "description", test_description))
-        errors.extend(validate_room_attribute(room, "roomPrice", test_price))
+        errors.extend(self.validate_room_attribute(room, "roomName", test_name))
+        errors.extend(self.validate_room_attribute(room, "type", test_type))
+        errors.extend(self.validate_room_attribute(room, "accessible", test_accessible))
+        errors.extend(self.validate_room_attribute(room, "image", test_image))
+        errors.extend(self.validate_room_attribute(room, "description", test_description))
+        errors.extend(self.validate_room_attribute(room, "roomPrice", test_price))
         if test_feature not in room.get("features"):
             errors.append(f"Did not find {test_feature} in room features: {room.get('features')}")
         # The list should be empty after all these checks
-        assert not errors, "\n".join(errors)
+        assert not errors, errors
 
     @pytest.mark.parametrize("room_type", valid_room_types)
     def test_all_valid_room_types(self, room_type, client, created_room_ids):
@@ -127,7 +130,7 @@ class TestRoomSmoke(object):
         ), f"Creating room returned HTTP {resp.status_code} response: {resp.text}"
         room = resp.json()
         created_room_ids.append(room.get("roomid"))
-        errors = validate_room_attribute(room, "type", room_type)
+        errors = self.validate_room_attribute(room, "type", room_type)
         assert not errors, errors
 
     def test_max_room_price(self, client, created_room_ids):
@@ -163,7 +166,7 @@ class TestRoomNegative(object):
     ):
         assert (
             expected_status_code == resp.status_code
-        ), f"Expected status code 400. Got: {resp.status_code}"
+        ), f"Expected status code {expected_status_code}. Got: {resp.status_code}"
         assert expected_error in resp.json().get("fieldErrors")
 
     def test_missing_room_name(self, client, created_room_ids):
