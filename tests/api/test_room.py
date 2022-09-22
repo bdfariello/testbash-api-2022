@@ -124,7 +124,6 @@ class TestRoomSmoke(object):
             "roomName": f"Room name with type {room_type}"
         }
         resp = client.room.create_room(room_data)
-        # Cleanup in case of successful creation
         assert (
             201 == resp.status_code
         ), f"Creating room returned HTTP {resp.status_code} response: {resp.text}"
@@ -195,8 +194,7 @@ class TestRoomNegative(object):
         self.validate_error_message(resp, "Type must be set")
 
     @pytest.mark.skip(reason=f"Known issue? fieldErrors did not contain "
-                             f"'must not be null' for a null room type"
-                      )
+                             f"'must not be null' for a null room type")
     def test_null_room_type(self, client, created_room_ids):
         room = {
             "type": None,
@@ -220,8 +218,7 @@ class TestRoomNegative(object):
         self.validate_error_message(resp, expected_error)
 
     @pytest.mark.skip(reason=f"Known issue? When Client does not send "
-                             f"roomPrice internal API defaults it invalid value: 0"
-                      )
+                             f"roomPrice internal API defaults it invalid value: 0")
     def test_missing_room_price(self, client, created_room_ids):
         room = {
             "type": "Single",

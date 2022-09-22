@@ -14,13 +14,12 @@ class TestAuth(object):
         if "cookie" not in client.request_headers:
             pytest.skip(reason="Cannot run valid token test case without valid token")
 
-    def test_invalid_login(self, test_auth_client, client):
-        test_auth_client.auth.logout()
+    def test_invalid_login(self, test_auth_client):
         response = test_auth_client.auth.login("admin", "WRONG")
         assert response.status_code == 403
         assert "cookie" not in test_auth_client.request_headers
 
-    def test_valid_login(self, test_auth_client, client):
+    def test_valid_login(self, test_auth_client):
         response = test_auth_client.auth.login("admin", "password")
         assert response.status_code == 200
         assert "cookie" in test_auth_client.request_headers
